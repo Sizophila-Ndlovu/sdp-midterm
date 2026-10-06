@@ -25,6 +25,13 @@ directory / repository / commit-set / author metrics, filterable by repository, 
 ## Quick start
 
 ```bash
+./start.sh               # then open http://localhost:5000
+```
+
+`start.sh` creates a virtualenv on first run, installs the dependencies and starts the
+server (honours a custom port: `./start.sh 5055`). Manual equivalent:
+
+```bash
 pip install -r requirements.txt
 python app.py            # then open http://localhost:5000
 ```
