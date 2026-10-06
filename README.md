@@ -70,8 +70,9 @@ aggregations (non-merge commits from HEAD, renames at 50 %):
 | git | 61 101 / 61 101 | 4 070 371 / 4 070 371 | 2 375 604 / 2 375 604 |
 
 A hand-computed fixture repository (renames, delete, binary file, mailmap alias, merge commit)
-is covered by `data/smoke.py` (31 exact-value checks, all passing), and the UI flows were
-exercised in a real browser session (no console errors).
+is covered by `tests/smoke_api.py` (31 exact-value checks, all passing; regenerate its fixture
+with `tests/make_fixture.sh`), and the UI flows were exercised in a real browser session
+(no console errors).
 
 **Performance at scale:** ingesting git (~61 000 non-merge commits) takes ≈ 1 minute (clone +
 parse); afterwards every dashboard interaction is an indexed query — root view ≈ 0.5 s first
