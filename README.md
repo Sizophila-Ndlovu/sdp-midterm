@@ -42,7 +42,6 @@ Add a repository from the left rail (zip or clone URL) and it is analysed automa
 ## Docs
 
 - [PLAN.md](PLAN.md) — architecture, data model, ingestion + metric design, milestones
-- [Priority.md](Priority.md) — rubric-guided work order (what we built first, and why)
 
 ## How it works (short version)
 

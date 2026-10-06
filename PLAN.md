@@ -6,8 +6,8 @@ in the brief.
 
 **Submission:** this public repository.
 
-**Companion:** [Priority.md](Priority.md) — rubric-guided build order. When in doubt about what
-to do next, that file wins.
+**Build order:** metric correctness first (P0), then filtering / author merge / multi-repo,
+then design and usability — the milestones below reflect it.
 
 ---
 
@@ -255,4 +255,4 @@ Layout: left rail (repos, add-repo, ingest progress) · top filter bar · main p
 | Huge numstat streams | stream-parse line by line (never buffer whole output); batched inserts |
 | Long ingest blocks the UI | worker thread + progress polling; dashboard usable while ingesting |
 | Push authentication | settle git credentials before the final submission push |
-| Time overrun | [Priority.md](Priority.md) order is the tie-breaker: metric correctness > everything |
+| Time overrun | metric correctness is the tie-breaker: drop visual polish first, never correctness |
