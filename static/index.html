@@ -1,12 +1,228 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RAT — Repo Analysis Tool</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>RAT · Repo Analysis Tool</title>
+<link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-  <h1>Repo Analysis Tool (RAT)</h1>
-  <p>The API is live under <code>/api/</code>. The dashboard UI arrives in the next milestone.</p>
+<div id="app">
+  <aside id="rail">
+    <div class="brand">
+      <div class="logo">RAT</div>
+      <div class="brand-text"><strong>Repo Analysis Tool</strong><span>git metrics dashboard</span></div>
+    </div>
+    <div class="rail-block">
+      <h2>Repositories</h2>
+      <ul id="repo-list" class="repo-list"></ul>
+      <p id="repo-empty" class="muted small">No repositories yet — add one below.</p>
+    </div>
+    <div class="rail-block">
+      <h2>Add repository</h2>
+      <div class="tabs">
+        <button id="tab-zip" class="tab active" type="button">Upload zip</button>
+        <button id="tab-url" class="tab" type="button">Clone URL</button>
+      </div>
+      <div id="pane-zip" class="pane">
+        <input type="file" id="zip-file" accept=".zip,application/zip"/>
+        <button id="zip-upload" class="primary" type="button">Upload &amp; analyse</button>
+      </div>
+      <div id="pane-url" class="pane hidden">
+        <input type="text" id="url-input" placeholder="https://github.com/user/repo.git"
+               spellcheck="false" autocomplete="off"/>
+        <button id="url-clone" class="primary" type="button">Clone &amp; analyse</button>
+      </div>
+      <p class="hint">Zip must contain the <code>.git</code> directory (full history).
+        Clones are deep and local.</p>
+    </div>
+  </aside>
+
+  <main id="main">
+    <header id="filterbar" class="hidden">
+      <div class="fb-row">
+        <div class="repo-head">
+          <h1 id="repo-name">—</h1>
+          <span id="repo-meta" class="muted small"></span>
+        </div>
+        <div class="filters">
+          <label class="field">Author
+            <select id="f-author"><option value="all">All authors</option></select>
+          </label>
+          <label class="field">Time
+            <select id="f-time">
+              <option value="all">All time</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="custom">Custom range…</option>
+            </select>
+          </label>
+          <span id="time-custom" class="hidden time-custom">
+            <input type="date" id="f-since" title="from (inclusive)"/>
+            <span class="muted">to</span>
+            <input type="date" id="f-until" title="to (inclusive)"/>
+          </span>
+          <div class="field">Commit set
+            <button id="f-commits" class="chip" type="button" title="Restrict to a manual commit selection">
+              All commits</button>
+          </div>
+          <button id="f-reset" class="ghost" type="button">Reset filters</button>
+        </div>
+      </div>
+      <div class="fb-row objects">
+        <nav id="crumbs" class="crumbs" aria-label="object"></nav>
+        <div class="obj-search">
+          <input id="obj-q" type="text" placeholder="Search files and directories…"
+                 spellcheck="false" autocomplete="off"/>
+          <div id="obj-results" class="obj-results hidden"></div>
+        </div>
+      </div>
+    </header>
+    <div id="loadingbar" class="hidden"></div>
+
+    <div id="content">
+      <section id="state-empty" class="state hidden">
+        <h2>No repositories yet</h2>
+        <p>Add one from the left rail to get started:</p>
+        <ul>
+          <li><strong>Upload zip</strong> — a zip of the repository that still contains its
+            <code>.git</code> directory (full history).</li>
+          <li><strong>Clone URL</strong> — any clonable git URL; the tool performs a full
+            (deep) bare clone.</li>
+        </ul>
+        <p class="muted">Every metric is computed from the commits reachable from
+          <code>HEAD</code> at ingestion time.</p>
+      </section>
+
+      <section id="state-ingest" class="state hidden">
+        <h2>Ingesting repository…</h2>
+        <p id="ingest-name" class="muted"></p>
+        <div class="progress big"><i id="ingest-bar"></i></div>
+        <p id="ingest-pct" class="muted small"></p>
+        <p class="muted small">Cloning and parsing history into the metric store.
+          Large repositories can take a few minutes; the dashboard loads automatically.</p>
+      </section>
+
+      <section id="state-error" class="state hidden">
+        <h2>Ingestion failed</h2>
+        <p id="error-msg" class="error-text"></p>
+        <p class="muted small">Remove the repository from the left rail, fix the source and add it again.</p>
+      </section>
+
+      <section id="dash" class="hidden">
+        <div id="cards" class="cards"></div>
+        <div id="obj-strip" class="obj-strip"></div>
+
+        <div class="grid2">
+          <div class="panel">
+            <div class="panel-head">
+              <h3 id="timeline-title">Churn over time</h3>
+              <span id="timeline-sub" class="muted small"></span>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="chart-timeline"></canvas>
+              <div id="chart-timeline-fb" class="chart-fb hidden"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Ownership</h3>
+              <span class="muted small">share of churn (λ)</span>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="chart-ownership"></canvas>
+              <div id="chart-ownership-fb" class="chart-fb hidden"></div>
+            </div>
+            <div id="own-legend" class="own-legend"></div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-dirs">
+          <div class="panel-head"><h3 id="dirs-title">Directory</h3></div>
+          <div id="dirs-body"></div>
+        </div>
+
+        <div class="panel" id="panel-files">
+          <div class="panel-head">
+            <h3>Files <span class="muted small">(recursive)</span></h3>
+            <div class="tools">
+              <input id="files-q" type="text" placeholder="Filter path…" spellcheck="false"/>
+              <select id="files-sort" title="Sort order">
+                <option value="churn">Sort: churn λ</option>
+                <option value="added">Sort: added l+</option>
+                <option value="removed">Sort: removed l−</option>
+                <option value="modifications">Sort: modifications n</option>
+                <option value="path">Sort: path</option>
+              </select>
+              <button id="files-csv" class="ghost" type="button">CSV</button>
+            </div>
+          </div>
+          <div id="files-body"></div>
+          <div id="files-pager" class="pager"></div>
+        </div>
+
+        <div class="panel" id="panel-authors">
+          <div class="panel-head">
+            <h3>Authors</h3>
+            <div class="tools">
+              <button id="authors-merge" class="ghost" type="button">Merge authors…</button>
+              <button id="authors-csv" class="ghost" type="button">CSV</button>
+            </div>
+          </div>
+          <div id="authors-body"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div id="modal-commits" class="modal hidden">
+  <div class="modal-card wide">
+    <div class="modal-head">
+      <h3>Select commits</h3>
+      <button class="x" data-close="modal-commits" type="button" title="Close">×</button>
+    </div>
+    <div class="modal-tools">
+      <input id="cm-q" type="text" placeholder="Search sha, summary, author…"
+             spellcheck="false" autocomplete="off"/>
+      <button id="cm-select-page" class="ghost" type="button">Select all on page</button>
+      <button id="cm-clear" class="ghost" type="button">Clear selection</button>
+    </div>
+    <div id="cm-body" class="modal-body"></div>
+    <div id="cm-pager" class="pager"></div>
+    <div class="modal-foot">
+      <span id="cm-count" class="muted"></span>
+      <div class="spacer"></div>
+      <button id="cm-all" class="ghost" type="button">Use all commits</button>
+      <button id="cm-apply" class="primary" type="button">Apply selection</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-merge" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Merge authors</h3>
+      <button class="x" data-close="modal-merge" type="button" title="Close">×</button>
+    </div>
+    <p class="muted small">Re-point every commit of the selected authors at one canonical
+      author. Useful when the same person committed under different names or emails.</p>
+    <label class="field block">Keep as
+      <select id="mg-target"></select>
+    </label>
+    <div class="field block">Merge into it
+      <div id="mg-sources" class="mg-sources"></div>
+    </div>
+    <div class="modal-foot">
+      <div class="spacer"></div>
+      <button id="mg-cancel" class="ghost" type="button">Cancel</button>
+      <button id="mg-apply" class="primary" type="button">Merge</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
+<script src="app.js"></script>
 </body>
 </html>
