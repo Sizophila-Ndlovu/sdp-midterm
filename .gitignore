@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Application data: cloned repositories + SQLite database
+data/
+
+# Workspace/IDE
+.aicoding-chat-workspace
