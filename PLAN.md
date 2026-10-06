@@ -82,6 +82,10 @@ file_changes(repo_id, commit_id, path, added, removed)
     -- one row per (commit, file) with a REAL line change (added+removed > 0);
     -- binary files never stored; renames stored under the NEW path
 
+dir_commits(repo_id, dir, commit_id)                 -- one row per (commit, directory touched);
+                                                     -- dir '' = repo root; PK (repo_id, dir,
+                                                     -- commit_id) WITHOUT ROWID
+
 files(repo_id, path)                                 -- files present at HEAD, so objects with
                                                      -- zero metrics can still be listed
 ```
@@ -92,10 +96,14 @@ Indexes: `commits(repo_id, committer_ts)`, `commits(repo_id, author_id)`,
 Notes:
 
 - Zero-change rows are never stored, so `added`/`removed` and "was modified in h" are the same
-  fact → `n` (modifications) is `COUNT(DISTINCT commit_id)`.
-- Directory and repository metrics are **not materialized**: they are prefix sums over file
-  rows (EXPLAIN-friendly with the `(repo_id, path)` index). Storing per-directory rows would
-  multiply ingest writes for no query speed gain we need.
+  fact → file-level `n` (modifications) is `COUNT(DISTINCT commit_id)`.
+- Directory/repository line metrics are **not materialized**: they are prefix sums over file
+  rows using a string-range scan on the `(repo_id, path)` index (`path >= o||'/' AND
+  path < o||'0'` — no LIKE escaping pitfalls).
+- Directory modification counts **are** materialized. One commit touching two files in the same
+  directory is one modification, not two, so prefix sums over `file_changes` overcount `n` for
+  directories; `dir_commits` stores the (commit, directory) pairs at ingest time (one extra
+  `INSERT OR IGNORE` per changed file's ancestor dirs) and directory `n` is an exact `COUNT(*)`.
 - Per-commit metrics (brief §2.1) are simply the `H = {h}` case — reachable through the manual
   commit-list filter with a single commit selected.
 
@@ -175,8 +183,9 @@ GET    /api/repos/<id>/authors        canonical authors + raw aliases
 POST   /api/repos/<id>/authors/merge  {"target": <id>, "sources": [<id>, ...]}
 GET    /api/repos/<id>/commits        paginated commits for manual selection (search by sha/author/date)
 GET    /api/repos/<id>/tree           file/dir listing for the object picker
-GET    /api/repos/<id>/metrics        one call per filter change; query params:
-        author, object (path or ''), since, until, commits (ids or csv of ids | all)
+GET/POST /api/repos/<id>/metrics      one call per filter change; params via query string
+        or JSON body (POST used when a manual commit list would overflow a URL):
+        author, object (path or ''), since, until, commits (csv of ids | all)
         returns: summary totals, |H|, timeline buckets, file rows, directory rollup,
                  author breakdown (n, λ, ω)
 ```
