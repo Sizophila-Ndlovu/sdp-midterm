@@ -77,8 +77,10 @@ aggregations (non-merge commits from HEAD, renames at 50 %):
 | git | 61 101 / 61 101 | 4 070 371 / 4 070 371 | 2 375 604 / 2 375 604 |
 
 A hand-computed fixture repository (renames, delete, binary file, mailmap alias, merge commit)
-is covered by `tests/smoke_api.py` (31 exact-value checks, all passing; regenerate its fixture
-with `tests/make_fixture.sh`), and the UI flows were exercised in a real browser session
+is covered two ways: `pytest tests/test_metrics.py` builds the fixture and ingests it into a
+throwaway database in-process (8 tests), and `tests/smoke_api.py` re-checks the same values
+against a live server (31 exact-value checks). The fixture itself is regenerated with
+`tests/make_fixture.sh`. The UI flows were exercised in a real browser session
 (no console errors). The provided sample metrics were cross-checked against the tool at their
 commit hashes as well — all matching.
 
