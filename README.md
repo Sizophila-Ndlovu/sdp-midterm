@@ -16,8 +16,9 @@ directory / repository / commit-set / author metrics, filterable by repository, 
   paginated picker).
 - **Author merging** — `.mailmap` is applied automatically at ingest; a merge dialog re-points
   commits when the same person committed under several names/emails.
-- **Visualisation** — churn timeline (auto day/month buckets) and ownership doughnut, plus
-  sortable/searchable/paginated tables with CSV export everywhere.
+- **Visualisation** — churn timeline (auto day/month buckets), ownership doughnut and a
+  clickable churn map (squarified treemap of the objects at the current level, sized by λ),
+  plus sortable/searchable/paginated tables with CSV export everywhere.
 - **Correctness rules from the brief** — only non-merge commits reachable from HEAD; committer
   dates for time filters; rename detection at 50 % (pure renames change nothing, edits count on
   the new path); binary files excluded via git; deletions count as removed lines on their path.

@@ -398,6 +398,7 @@ function renderDash() {
   renderCards();
   renderObjStrip();
   renderDirs();
+  renderTreemap();
   renderFiles();
   renderAuthors();
   renderTimeline();
@@ -481,6 +482,124 @@ function renderDirs() {
     tr.onclick = () => navigate(tr.dataset.path, tr.dataset.type);
   });
 }
+
+/* ---------------- churn map: squarified treemap of the current level ---------------- */
+
+const tmBase = (p) => p.slice(p.lastIndexOf("/") + 1) || p;
+
+// classic squarified treemap: rows of items along the shortest side, keeping
+// each cell as close to a square as the sizes allow
+function squarify(items, W, H) {
+  const out = [];
+  const total = items.reduce((s, it) => s + it.value, 0);
+  if (!total || W <= 0 || H <= 0) return out;
+  const unit = (W * H) / total;                    // area per churn unit
+  const rest = items.map((it) => ({ ...it, area: it.value * unit }));
+  let x = 0, y = 0, rw = W, rh = H, row = [];
+
+  const sum = (r) => r.reduce((s, it) => s + it.area, 0);
+  const worst = (r, len) => {
+    const t = sum(r) / len;
+    return Math.max(...r.map((it) => {
+      const side = it.area / t;
+      return Math.max(t / side, side / t);
+    }));
+  };
+  const place = () => {
+    const s = sum(row);
+    if (rw >= rh) {                                // strip on the left
+      const tw = s / rh;
+      let oy = y;
+      for (const it of row) {
+        const th = it.area / tw;
+        out.push({ ...it, x, y: oy, w: tw, h: th });
+        oy += th;
+      }
+      x += tw; rw -= tw;
+    } else {                                       // strip on top
+      const th = s / rw;
+      let ox = x;
+      for (const it of row) {
+        const tw = it.area / th;
+        out.push({ ...it, x: ox, y, w: tw, h: th });
+        ox += tw;
+      }
+      y += th; rh -= th;
+    }
+    row = [];
+  };
+
+  for (const it of rest) {
+    if (rw < 1 || rh < 1) { out.push({ ...it, x, y, w: 0, h: 0 }); continue; }
+    const short = Math.min(rw, rh);
+    if (!row.length || worst([...row, it], short) <= worst(row, short)) row.push(it);
+    else { place(); row.push(it); }
+  }
+  if (row.length) place();
+  return out;
+}
+
+function renderTreemap() {
+  const panel = $("panel-treemap");
+  if (S.type !== "dir" || !S.data.dirs) { panel.classList.add("hidden"); return; }
+  panel.classList.remove("hidden");
+  const box = $("treemap"), fb = $("treemap-fb");
+  const kids = [
+    ...S.data.dirs.dirs.filter((x) => x.churn > 0)
+      .map((x) => ({ path: x.path, dir: true, value: x.churn, n: x.modifications })),
+    ...S.data.dirs.files.filter((x) => x.churn > 0)
+      .map((x) => ({ path: x.path, dir: false, value: x.churn, n: x.modifications })),
+  ].sort((a, b) => b.value - a.value);
+  if (!kids.length) {
+    box.classList.add("hidden");
+    fb.hidden = false;
+    fb.textContent = "Nothing with churn at this level for the current filter.";
+    return;
+  }
+  box.classList.remove("hidden");
+  fb.hidden = true;
+  const CAP = 32;                                  // keep the map readable on wide trees
+  let items = kids;
+  if (kids.length > CAP) {
+    const tail = kids.slice(CAP);
+    items = kids.slice(0, CAP).concat([{
+      path: `+ ${tail.length} smaller objects`, dir: false, other: true,
+      value: tail.reduce((s, x) => s + x.value, 0),
+      n: tail.reduce((s, x) => s + x.n, 0),
+    }]).sort((a, b) => b.value - a.value);
+  }
+  const W = box.clientWidth || 600, H = box.clientHeight || 260;
+  box.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  squarify(items, W, H).forEach((c, i) => {
+    const el = document.createElement("div");
+    el.className = "tm-cell" + (c.dir ? " tm-dir" : "") + (c.other ? " tm-other" : "");
+    if (!c.other) el.style.background = c.dir ? PALETTE[i % PALETTE.length] : "#64748b";
+    el.style.left = (c.x / W * 100) + "%";
+    el.style.top = (c.y / H * 100) + "%";
+    el.style.width = (c.w / W * 100) + "%";
+    el.style.height = (c.h / H * 100) + "%";
+    el.title = `${c.path} \u2014 churn \u03bb ${fmt(c.value)}, n ${fmt(c.n)}`;
+    if (c.w >= 38 && c.h >= 24) {
+      el.innerHTML = `<span class="tm-name">${esc(tmBase(c.path))}${c.dir ? "/" : ""}</span>
+        <span class="tm-val">\u03bb ${fmt(c.value)}</span>`;
+    } else {
+      el.classList.add("tm-mini");
+    }
+    if (!c.other) el.onclick = () => navigate(c.path, c.dir ? "dir" : "file");
+    frag.appendChild(el);
+  });
+  box.appendChild(frag);
+}
+
+// keep the proportions correct when the window is resized
+let tmResize;
+window.addEventListener("resize", () => {
+  clearTimeout(tmResize);
+  tmResize = setTimeout(() => {
+    if (S.data && S.type === "dir" && !$("dash").classList.contains("hidden")) renderTreemap();
+  }, 250);
+});
 
 function renderFiles() {
   const panel = $("panel-files");
