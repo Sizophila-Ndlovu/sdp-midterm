@@ -189,10 +189,11 @@ def repo_metrics(rid):
     except (TypeError, ValueError):
         abort(400, description="files_limit and files_offset must be integers")
     sort = data.get("sort") or "churn"
+    q = (data.get("q") or "").strip()
     with storage.db() as cx:
         _require_ready(cx, rid)
         out = metrics.dashboard(cx, rid, path=path, is_dir=is_dir, files_limit=limit,
-                                files_offset=offset, sort=sort, **f)
+                                files_offset=offset, sort=sort, q=q, **f)
     return jsonify(out)
 
 

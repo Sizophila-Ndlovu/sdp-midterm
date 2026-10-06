@@ -122,22 +122,29 @@ def subtree_rows(cx, repo_id, path, **f):
     return [dict(r) for r in rows]
 
 
-def files_page(cx, repo_id, path, limit, offset, sort="churn", **f):
+def files_page(cx, repo_id, path, limit, offset, sort="churn", q=None, **f):
     """Recursive file table under `path`, paginated and sorted (server-side)."""
     where, params = _h_clause(repo_id, **f)
+    cond, cparams = where, list(params)
     rc, rp = _range_clause(path)
-    cond = f"{where} AND {rc}" if rc else where
+    if rc:
+        cond += f" AND {rc}"
+        cparams += rp
+    if q:
+        cond += " AND fc.path LIKE ? ESCAPE '\\'"
+        cparams.append(_like(q))
     order = _SORTS.get(sort, _SORTS["churn"])
+    direction = "ASC" if order == "fc.path" else "DESC"
     rows = cx.execute(
         "SELECT fc.path AS path, SUM(fc.added) AS added, SUM(fc.removed) AS removed,"
         " COUNT(DISTINCT fc.commit_id) AS modifications"
         " FROM file_changes fc JOIN commits c ON c.id = fc.commit_id"
-        f" WHERE {cond} GROUP BY fc.path ORDER BY {order} DESC LIMIT ? OFFSET ?",
-        params + rp + [int(limit), int(offset)]).fetchall()
+        f" WHERE {cond} GROUP BY fc.path ORDER BY {order} {direction} LIMIT ? OFFSET ?",
+        cparams + [int(limit), int(offset)]).fetchall()
     total = cx.execute(
         "SELECT COUNT(DISTINCT fc.path) FROM file_changes fc"
         " JOIN commits c ON c.id = fc.commit_id"
-        f" WHERE {cond}", params + rp).fetchone()[0]
+        f" WHERE {cond}", cparams).fetchone()[0]
     out = []
     for r in rows:
         d = dict(r)
@@ -346,22 +353,22 @@ def objects_search(cx, repo_id, q, limit=60):
 
 
 def dashboard(cx, repo_id, path="", is_dir=True, files_limit=200, files_offset=0,
-              sort="churn", **f):
+              sort="churn", q=None, **f):
     """Everything the UI needs for one filter in a single response."""
     key = ("dash", int(repo_id), path, bool(is_dir), int(files_limit), int(files_offset),
-           sort, tuple(sorted((k, tuple(v) if isinstance(v, list) else v)
-                              for k, v in f.items())))
+           sort, q or "", tuple(sorted((k, tuple(v) if isinstance(v, list) else v)
+                                       for k, v in f.items())))
     return _cached(key, lambda: _dashboard(cx, repo_id, path, is_dir, files_limit,
-                                           files_offset, sort, f))
+                                           files_offset, sort, q, f))
 
 
-def _dashboard(cx, repo_id, path, is_dir, files_limit, files_offset, sort, f):
+def _dashboard(cx, repo_id, path, is_dir, files_limit, files_offset, sort, q, f):
     h_count = count_commits(cx, repo_id, **f)
     obj = object_metrics(cx, repo_id, path, is_dir, **f)
     obj["modification_frequency"] = _ratio(obj["modifications"], h_count)
     obj["churn_rate"] = _ratio(obj["churn"], h_count)
 
-    files = files_page(cx, repo_id, path, files_limit, files_offset, sort, **f)
+    files = files_page(cx, repo_id, path, files_limit, files_offset, sort, q=q, **f)
     for row in files["rows"]:
         _with_rates(row, h_count)
 
