@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 
 # \x01 marks a commit header line; \x1f separates its fields
 LOG_FORMAT = "%x01%H%x1f%P%x1f%an%x1f%ae%x1f%aN%x1f%aE%x1f%ct%x1f%s"
-FLUSH_EVERY_COMMITS = 5000
+FLUSH_EVERY_COMMITS = 1000
 FLUSH_EVERY_ROWS = 20000
 
 
