@@ -92,4 +92,3 @@ repositories).
 AI Declaration: Qoder (agentic coding IDE) — code written with AI assistance; every metric
 verified against raw `git` and reviewed before submission.
 
-*(confirm this line before submitting)*
