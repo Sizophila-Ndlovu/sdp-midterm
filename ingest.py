@@ -185,6 +185,7 @@ def _analyze(repo_id, git_dir):
         _load_files(cx, repo_id, git_dir)
         cx.execute("UPDATE repos SET status = 'ready', progress = 1, message = NULL,"
                    " commit_count = ? WHERE id = ?", (count, repo_id))
+        cx.execute("ANALYZE")  # fresh stats so the planner picks index-driven plans
         cx.commit()
         log.info("repo %s (%s) ingested: %s commits", repo_id, git_dir, count)
     finally:

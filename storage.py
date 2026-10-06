@@ -115,6 +115,13 @@ def init_db():
     REPOS_DIR.mkdir(parents=True, exist_ok=True)
     with db() as cx:
         cx.executescript(SCHEMA)
+        # a repo can only be 'ingesting' while its worker thread lives in this process,
+        # so anything left over from a previous run was interrupted by a restart
+        cx.execute("UPDATE repos SET status = 'error', message = ?"
+                   " WHERE status = 'ingesting'",
+                   ("ingestion was interrupted (the server restarted); "
+                    "remove the repository and add it again",))
+        cx.execute("ANALYZE")  # keep planner stats fresh even if ANALYZE was never run
 
 
 def list_repos(cx):
